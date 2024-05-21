@@ -159,3 +159,14 @@ select *
 from abc
 order by total desc
 ;
+
+# 지역별 가장 키 큰 사람들의 평균
+with cte(address, max_height)
+         as (select address, max(height)
+             from user
+             group by address)
+select avg(max_height)
+from cte
+;
+
+#
