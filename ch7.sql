@@ -49,17 +49,21 @@ select field('b', 'a', 'b', 'c'); -- 2
 select find_in_set('b', 'a,b,c'); -- 2
 
 select instr('abc', 'b'); -- 2
-select locate('b', 'abc'); -- 2
+select locate('b', 'abc');
+-- 2
 
 # 실수 포맷
-select format(12345.123456789, 5); -- 12,345.12346
+select format(12345.123456789, 5);
+-- 12,345.12346
 
 # 삽입
-select insert('123456789', 3, 5, '@@@@'); -- 12@@@@89, 3번째부터 5개 문자를 지우고 @@@@삽입
+select insert('123456789', 3, 5, '@@@@');
+-- 12@@@@89, 3번째부터 5개 문자를 지우고 @@@@삽입
 
 # 패딩
 select lpad('123456789', 11, '@'); -- @@123456789, 길이를 11로 늘리고 빈곳을 @로 채우기
-select rpad('123456789', 11, '@'); -- 123456789@@
+select rpad('123456789', 11, '@');
+-- 123456789@@
 
 # 문자열 자르기
 select left('123456789', 3); -- 123
@@ -69,7 +73,8 @@ select substring('123456789', 1, 3); -- 123
 select substring('123456789', 4, 3); -- 456
 
 select substring_index('123.456.789', '.', 2); -- 123.456
-select substring_index('123.456.789', '.', -2); -- 456.789
+select substring_index('123.456.789', '.', -2);
+-- 456.789
 
 # 공백 제거 - 중간 공백은 처리 불가
 select ltrim('      12345 6789      '); -- '12345 6789      '
@@ -77,16 +82,20 @@ select rtrim('      12345 6789      '); -- '      12345 6789'
 select trim('      12345 6789      '); -- '12345 6789'
 select trim(both ' ' from '      12345 6789      '); -- '12345 6789'
 select trim(leading ' ' from '      12345 6789      '); -- '12345 6789      ', ltrim과 동일
-select trim(trailing ' ' from '      12345 6789      '); -- '      12345 6789', rtrim과 동일
+select trim(trailing ' ' from '      12345 6789      ');
+-- '      12345 6789', rtrim과 동일
 
 # 공백 추가
-select space(10); -- '          '
+select space(10);
+-- '          '
 
 # 반복
-select repeat('123456789', 2); -- 123456789123456789
+select repeat('123456789', 2);
+-- 123456789123456789
 
 # 변경
-select replace('123456789', '123', '#####'); -- #####456789
+select replace('123456789', '123', '#####');
+-- #####456789
 
 # 거꾸로
 select reverse('123456789');
@@ -96,14 +105,16 @@ select reverse('123456789');
 select adddate('2024-05-01', interval 31 day); -- 2024-06-01
 select adddate('2024-05-01', interval 1 month); -- 2024-06-01
 select subdate('2024-07-01', interval 30 day); -- 2024-06-01
-select subdate('2024-07-01', interval 1 month); -- 2024-06-01
+select subdate('2024-07-01', interval 1 month);
+-- 2024-06-01
 
 
 # 시간 계산
 select addtime('2024-05-31 23:59:59', '0:0:1'); -- 2024-06-01 00:00:00
 select addtime('23:59:59', '0:0:1'); -- 24:00:00
 select subtime('2024-06-02 00:00:00', '0:0:1'); -- 2024-06-01 23:59:59
-select subtime('24:00:00', '0:0:1'); -- 23:59:59
+select subtime('24:00:00', '0:0:1');
+-- 23:59:59
 
 
 # 현재날짜/시간
@@ -114,18 +125,202 @@ select sysdate();
 
 # 날짜/시간 추출
 select date('2024-06-01 00:00:00'); -- 2024-06-01
-select time('2024-06-01 00:00:00'); -- 00:00:00
+select time('2024-06-01 00:00:00');
+-- 00:00:00
 
 # 날짜/시간 차이
 select datediff('2024-06-02', '2024-06-01'); -- 1
-select timediff('2024-06-02 00:00:00', '2024-06-01 12:00:00'); -- 12:00:00
+select timediff('2024-06-02 00:00:00', '2024-06-01 12:00:00');
+-- 12:00:00
 
 # 뭐가 많군.....
 
 # 정보
 select user(), database(), version(), sleep(4);
 
-#
-update buy set price=price*2;
-select row_count();
 
+# blob, clob
+create table movie
+(
+    id       int,
+    title    varchar(30),
+    director varchar(20),
+    star     varchar(20),
+    script   longtext,
+    film     longblob
+);
+
+insert into movie
+values (1, '파묘', '김또깡', '최민식', LOAD_FILE('C:/test/test.txt'), LOAD_FILE('C:/test/test.mp4'));
+select *
+from movie;
+
+-- longtext, longblob이 null이면 아래 값들 확인. 값은 my.ini(리눅스는 my.enf)에서 수정
+show variables like 'max_allowed_packet'; -- 최대 파일 크기
+show variables like 'secure_file_priv'; -- 파일 업/다운 폴더 위치
+
+truncate movie;
+insert into movie
+values (1, '파묘', '김또깡', '최민식', LOAD_FILE('C:/test/test.txt'), LOAD_FILE('C:/test/test.mp4'));
+select *
+from movie;
+
+select script
+from movie
+where id = 1
+into outfile 'C:/test/test_bak.txt' lines terminated by '\\n'; -- longtext 다운로드
+
+select film
+from movie
+where id = 1
+into dumpfile 'C:/test/test_bak.mp4';
+-- longblob 파일 다운로드
+
+
+# 피벗
+drop table if exists pivot;
+create table pivot
+(
+    name   char(3),
+    season char(2),
+    amount int
+);
+insert into pivot
+values ('김범수', '겨울', 10),
+       ('윤종신', '여름', 15),
+       ('김범수', '가을', 25),
+       ('김범수', '봄', 3),
+       ('김범수', '봄', 37),
+       ('윤종신', '겨울', 40),
+       ('김범수', '여름', 14),
+       ('김범수', '겨울', 22),
+       ('윤종신', '여름', 64)
+;
+
+select *
+from pivot;
+
+select name
+     , sum(if(season = '봄', amount, 0))  as '봄'
+     , sum(if(season = '여름', amount, 0)) as '여름'
+     , sum(if(season = '가을', amount, 0)) as '가을'
+     , sum(if(season = '겨울', amount, 0)) as '겨울'
+     , sum(amount)                       as '합계'
+from pivot
+group by name
+;
+
+select season
+     , sum(if(name = '김범수', amount, 0)) as '김범수'
+     , sum(if(name = '윤종신', amount, 0)) as '윤종신'
+     , sum(amount)                      as '합계'
+from pivot
+group by season
+;
+
+
+-- JSON
+select JSON_OBJECT('name', name, 'height', height)
+from user
+where height >= 180
+;
+
+SET @json = '{"user" :
+    [
+        {"name": "임재범", "height": 182},
+        {"name": "이승기", "height": 182},
+        {"name": "성시경", "height": 186}
+    ]
+}';
+
+select @json;
+select json_valid(@json)                                  as valid
+     , json_search(@json, 'one', '성시경')                   as search
+     , json_extract(@json, '$.user[2].name')              as extract
+     , json_insert(@json, '$.user[0].date', '2024-05-01') as `insert`
+     , json_replace(@json, '$.user[0].name', '홍길동')       as `replace`
+     , json_remove(@json, '$.user[1]')                    as remove
+;
+
+
+# join
+drop table if exists student;
+create table student
+(
+    name    char(4) not null primary key,
+    address char(2) not null
+);
+insert into student
+values ('김범수', '경남'),
+       ('성시경', '서울'),
+       ('조용필', '경기'),
+       ('은지원', '경북'),
+       ('바비킴', '서울')
+;
+select *
+from student
+;
+
+
+drop table if exists club;
+create table club
+(
+    name     char(4) not null primary key,
+    room_num char(4) not null
+);
+insert into club
+values ('수영', '101호')
+     , ('바둑', '102호')
+     , ('축구', '103호')
+     , ('봉사', '104호');
+select *
+from club;
+
+
+drop table if exists stdclub;
+create table stdclub
+(
+    id        int auto_increment not null primary key,
+    name      char(4)            not null,
+    club_name char(4)            not null,
+    foreign key (name) references student (name),
+    foreign key (club_name) references club (name)
+);
+
+insert into stdclub
+values (null, '김범수', '바둑'),
+       (null, '김범수', '축구'),
+       (null, '조용필', '축구'),
+       (null, '은지원', '축구'),
+       (null, '은지원', '봉사'),
+       (null, '바비킴', '봉사');
+
+
+
+create table emp
+(
+    name    char(3),
+    manager char(3),
+    tel     varchar(8)
+);
+
+INSERT INTO emp
+VALUES ('나사장', NULL, '0000'),
+       ('김재무', '나사장', '2222'),
+       ('김부장', '김재무', '2222-1'),
+       ('이부장', '김재무', '2222-2'),
+       ('우대리', '이부장', '2222-2-1'),
+       ('지사원', '이부장', '2222-2-2'),
+       ('이영업', '나사장', '1111'),
+       ('한과장', '이영업', '1111-1'),
+       ('최정보', '나사장', '3333'),
+       ('윤차장', '최정보', '3333-1'),
+       ('이주임', '윤차장', '3333-1-1');
+
+-- 우대리 상관의 연락처
+select e1.name, e1.manager, e2.tel
+from emp e1
+join emp e2
+on e1.manager = e2.name
+where e1.name = '우대리'
+;
