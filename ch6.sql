@@ -4,7 +4,9 @@ create database sqldb;
 use sqldb;
 
 ################ table 생성
+drop table if exists buy;
 drop table if exists user;
+
 create table user
 (
     user_id    char(8)     not null primary key,
@@ -18,7 +20,6 @@ create table user
 );
 
 
-drop table if exists buy;
 create table buy
 (
     id           int auto_increment not null primary key,
@@ -57,11 +58,6 @@ insert into buy
     (NULL, 'BBK', '운동화', NULL, 30, 2),
     (NULL, 'EJW', '책', '서적', 15, 1),
     (NULL, 'BBK', '운동화', NULL, 30, 2);
-
-delete
-from user;
-delete
-from buy;
 
 
 ################ any : 서브쿼리의 결과들을 하나라도 만족하면 true

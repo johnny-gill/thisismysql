@@ -320,7 +320,169 @@ VALUES ('나사장', NULL, '0000'),
 -- 우대리 상관의 연락처
 select e1.name, e1.manager, e2.tel
 from emp e1
-join emp e2
-on e1.manager = e2.name
+         join emp e2
+              on e1.manager = e2.name
 where e1.name = '우대리'
 ;
+
+-- stored procedure
+drop procedure if exists ifProc;
+delimiter $$
+create procedure ifProc()
+begin
+    declare var int;
+    set var = 100;
+
+    if var = 100 then
+        select '100입니다..';
+    else
+        select '100아님..';
+    end if;
+end $$
+delimiter ;
+call ifProc();
+
+
+# 10001번 직원의 입사일이 5년이 넘었는가?
+use employees;
+drop procedure if exists ifProc2;
+
+delimiter $$
+create procedure ifProc2()
+begin
+    declare hireDate date;
+    declare curDate date;
+    declare days int; -- 근무 일수
+
+    select hire_date
+    into hireDate
+    from employees.employees
+    where emp_no = 10001;
+
+    set curDate = curdate();
+    set days = datediff(curdate(), hireDate);
+
+    if (days / 365) >= 5 then
+        select concat('입사한지 5년 이상입니다!!', days);
+    else
+        select concat('입사한지 5년 미만입니다ㅠㅠ', days);
+    end if;
+end $$
+delimiter ;
+call ifProc2();
+
+# procedure + case
+drop procedure if exists ifProc3;
+delimiter $$
+create procedure ifProc3()
+begin
+    declare point int;
+    declare credit char(1);
+    set point = 77;
+
+    case
+        when point >= 90 then set credit = 'A';
+        when point >= 80 then set credit = 'B';
+        when point >= 70 then set credit = 'C';
+        when point >= 60 then set credit = 'D';
+        else set credit = 'E';
+        end case;
+
+    select credit;
+end $$
+delimiter ;
+call ifProc3();
+
+
+# 유저별 총구매액
+use sqldb;
+select u.user_id
+     , sum(price * amount) as total
+     , case
+           when sum(price * amount) >= 1500 then '최우수고객'
+           when sum(price * amount) >= 1000 then '우수고객'
+           when sum(price * amount) >= 1 then '일반고객'
+           else '유령고객'
+    end                    as '고객등급'
+from buy b
+         right join user u
+                    on b.user_id = u.user_id
+group by u.user_id, u.name
+order by total desc;
+
+# while
+drop procedure if exists whileProc;
+delimiter $$
+create procedure whileProc()
+begin
+    declare i int;
+    declare sum int;
+    set i = 1;
+    set sum = 0;
+
+    myWhile:
+    while (i <= 100)
+        do
+            if (i % 7 = 0) then
+                set i = i + 1;
+                iterate myWhile;
+            end if;
+
+            set sum = sum + i;
+
+            if (sum > 1000) then
+                leave myWhile;
+            end if;
+
+            set i = i + 1;
+        end while;
+
+    select sum;
+end $$
+delimiter ;
+call whileProc();
+
+
+# 예외 처리
+drop procedure if exists errorProc;
+delimiter $$
+create procedure errorProc()
+begin
+    declare continue handler for 1146 select '테이블이 없네요' as 'message';
+    select * from aaaaaaaaaaaaaa;
+end $$
+delimiter ;
+call errorProc();
+
+# 예외처리
+drop procedure if exists errorProc2;
+delimiter $$
+create procedure errorProc2()
+begin
+    declare continue handler for sqlexception
+        begin
+            show errors;
+            select '오류 발생' as 'message';
+            rollback;
+        end;
+    INSERT INTO user VALUES ('LSG', '이승기', 1987, '서울', '011', '1111111', 182, '2008-08-08');
+end $$
+delimiter ;
+call errorProc2();
+
+
+# prepare, execute
+drop table if exists prepare;
+create table prepare
+(
+    id       int not null auto_increment primary key,
+    datetime datetime
+);
+
+set @curDatetime = current_timestamp;
+prepare myQuery from 'insert into prepare values (null, ?)';
+execute myQuery using @curDatetime;
+deallocate prepare myQuery;
+
+select *
+from prepare;
