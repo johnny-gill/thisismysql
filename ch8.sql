@@ -350,3 +350,28 @@ values ('SJH', '서장훈', '서울', '010', '33333333', 155, '2023-05-05');
 check table v_height177;
 
 
+# tablespace
+# C:\ProgramData\MySQL\MySQL Server 8.0\Data
+-- 시스템 ts
+show variables like 'innodb_data_file_path';
+
+-- 사용자 ts
+create tablespace ts_a add datafile 'ts_a.ibd';
+create tablespace ts_b add datafile 'ts_b.ibd';
+create tablespace ts_c add datafile 'ts_c.ibd';
+
+select *
+from information_schema.INNODB_TABLESPACES_BRIEF;
+
+create table tb_a
+(
+    id int
+) tablespace ts_a;
+
+alter table tb_a
+    tablespace ts_b;
+
+create table tb_c (select *
+                   from employees.salaries);
+alter table tb_c tablespace ts_c;
+
