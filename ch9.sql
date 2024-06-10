@@ -185,3 +185,81 @@ alter table mixed
 
 show index from mixed;
 
+
+# user, buy 초기화
+use sqldb;
+select *
+from user;
+select *
+from buy;
+
+
+show index from user;
+show index from buy;
+show table status;
+SHOW VARIABLES like 'innodb_page_size';
+-- data_length는 cluster index의 크기 (Byte)
+-- index_length는 secondary index의 크기 (Byte)
+-- 16384(1024*16)=16KB=1페이지
+
+
+# 단순 secondary index (중복 허용)
+create index idx_user_address on user (address);
+show index from user; -- non_unique=1
+show table status like 'user'; -- index_length=0, 먼저 analyze 해줘야 index_length값이 변경됨
+analyze table user;
+show table status like 'user';
+-- index_length=16384
+
+
+# 고유(unique) secondary index (중복 불가)
+create unique index idx_user_birth_year on user (birth_year); -- 1979년 중복이라 birth_year에는 인덱스 생성 불가
+create unique index idx_user_name on user (name);
+show index from user;
+analyze table user;
+show table status like 'user';
+-- index_length=32768
+insert into user
+values ('GBS', '김범수', 1979, '경남', '011', '2222222', 173, '2012-4-4');
+-- unique 설정되어 name 중복 불가
+
+
+# index에 두개 열
+show index from user;
+drop index idx_user_name on user;
+create index idx_user_name_birth_year on user (name, birth_year);
+show index from user;
+explain
+select *
+from user
+where name = '윤종신'
+  and birth_year = 1969;
+
+
+# 데이터 종류가 얼마없으면 인덱스 없는게 낫다.
+create index idx_user_mobile1 on user (mobile1);
+explain
+select *
+from user
+where mobile1 = '010';
+
+
+# index 삭제 (보조인덱스부터 삭제한다.)
+show index from user;
+drop index idx_user_address on user;
+alter table user
+    drop index idx_user_name_birth_year; -- alter로도 가능
+drop index idx_user_mobile1 on user;
+alter table user
+    drop PRIMARY KEY; -- cluster index는 alter로만 삭제 가능. fk걸려있어 fk먼저 삭제
+select *
+from information_schema.REFERENTIAL_CONSTRAINTS
+where CONSTRAINT_SCHEMA = 'sqldb'; -- 외래키 확인
+alter table buy
+    drop constraint buy_ibfk_1;
+alter table buy
+    drop foreign key buy_ibfk_1; -- 위랑 동일
+alter table user
+    drop primary key;
+show index from user;
+
