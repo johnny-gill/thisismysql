@@ -198,7 +198,7 @@ show index from user;
 show index from buy;
 show table status;
 SHOW VARIABLES like 'innodb_page_size';
--- data_length는 cluster index의 크기 (Byte)
+-- data_length는 데이터 페이지 또는 cluster index의 크기 (Byte)
 -- index_length는 secondary index의 크기 (Byte)
 -- 16384(1024*16)=16KB=1페이지
 
@@ -262,4 +262,161 @@ alter table buy
 alter table user
     drop primary key;
 show index from user;
+
+
+# 인덱스 성능 테스트
+create database if not exists indexdb;
+use indexdb;
+
+create table emp_org
+select *
+from employees.employees
+order by rand();
+create table emp_cluster
+select *
+from employees.employees
+order by rand();
+create table emp_secondary
+select *
+from employees.employees
+order by rand();
+
+select *
+from emp_org;
+select *
+from emp_cluster;
+select *
+from emp_secondary;
+
+show table status;
+-- data_length가 17317888B/16384B(1페이지) = 1057페이지.
+-- 데이터만 복사되었기때문에 cluster index에 대한 용량은 없음
+
+
+alter table emp_cluster
+    add primary key (emp_no);
+alter table emp_secondary
+    add index idx_emp_no (emp_no);
+
+select *
+from emp_cluster;
+select *
+from emp_secondary;
+
+analyze table emp_org, emp_cluster, emp_secondary;
+show table status; -- emp_secondary는 secondary index page가 생성되었다. (5783552B/16384B = 353페이지)
+show index from emp_org;
+show index from emp_cluster;
+show index from emp_secondary;
+
+
+-- net stop MySQL80
+-- net start MySQL80
+show global status like 'Innodb_pages_read'; -- 2159
+select *
+from emp_org
+where emp_no = 100000;
+show global status like 'Innodb_pages_read';
+-- 2210
+-- index 없는경우 : 2210-2159 = 51 페이지 읽음
+
+
+-- net stop MySQL80
+-- net start MySQL80
+show global status like 'Innodb_pages_read'; -- 1044
+select *
+from emp_cluster
+where emp_no = 100000;
+show global status like 'Innodb_pages_read';
+-- 1047
+-- cluster index의 경우 : 1047-1044 = 3 페이지 읽음
+
+
+-- net stop MySQL80
+-- net start MySQL80
+show global status like 'Innodb_pages_read'; -- 1047
+select *
+from emp_secondary
+where emp_no = 100000;
+show global status like 'Innodb_pages_read';
+-- 1052
+-- secondary index의 경우 : 1052-1047 = 5 페이지 읽음
+
+
+# 인덱스 범위 조회 성능 비교
+show global status like 'Innodb_pages_read'; -- 1048
+select *
+from emp_org
+where emp_no <= 11000;
+show global status like 'Innodb_pages_read'; -- 1594
+
+show global status like 'Innodb_pages_read'; -- 1049
+select *
+from emp_cluster
+where emp_no <= 11000;
+show global status like 'Innodb_pages_read'; -- 1054
+
+show global status like 'Innodb_pages_read'; -- 1044
+select * -- index range scan
+from emp_secondary
+where emp_no <= 11000;
+show global status like 'Innodb_pages_read'; -- 1431
+
+
+show global status like 'Innodb_pages_read'; -- 1048
+select *
+from emp_cluster
+where emp_no < 500000
+limit 1000000;
+show global status like 'Innodb_pages_read';
+-- 1936
+-- 읽은 page 1936-1048=888
+show table status; -- cluster index(data_length)의 page가 1057페이지니까 거의 모든 페이지를 읽은거나 다름없음. 여기선 index range scan을 함
+
+
+show global status like 'Innodb_pages_read'; -- 1047
+select *
+from emp_cluster ignore index (PRIMARY)
+where emp_no < 500000
+limit 1000000;
+show global status like 'Innodb_pages_read';
+-- 1935
+-- hint릎 통해 index를 제거했는데도 전체 페이지 읽는거랑 비슷. 여기선 full table scan을함
+
+
+show global status like 'Innodb_pages_read'; -- 1047
+select *
+from emp_secondary
+where emp_no < 11000;
+show global status like 'Innodb_pages_read';
+-- 1434
+-- 387. cluster index보단 페이지를 많이 읽지만 인덱스가 있어 full table scan을 하지 않음
+
+show global status like 'Innodb_pages_read'; -- 1047
+select *
+from emp_secondary ignore index (idx_emp_no)
+where emp_no < 11000;
+show global status like 'Innodb_pages_read';
+-- 1593
+-- full table scan
+
+
+show global status like 'Innodb_pages_read'; -- 1045
+select *
+from emp_secondary
+where emp_no < 400000
+limit 500000;
+show global status like 'Innodb_pages_read';
+-- 2115
+-- secondary index는 cluster index와 다르게 전체 테이블을 검색할 것 같을때에는 index range scan이 아니라 full table scan을 사용함!!!!!!
+
+select *
+from emp_secondary
+where emp_no < 50000
+limit 5000000;
+-- 50000정도에서 index range scan을 한다.
+-- 30만개 중 5만개.. secondary index에서 전체 데이터 중 약 15% 이상 스캔시 mysql은 full table scan을 한다~~~
+
+
+
 
