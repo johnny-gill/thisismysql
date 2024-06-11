@@ -418,5 +418,34 @@ limit 5000000;
 -- 30만개 중 5만개.. secondary index에서 전체 데이터 중 약 15% 이상 스캔시 mysql은 full table scan을 한다~~~
 
 
+# 잘못된 쿼리문의 성능
 
+show global status like 'Innodb_pages_read'; -- 1105
+explain
+select *
+from emp_cluster
+where emp_no * 1 = 100000;
+show global status like 'Innodb_pages_read';
+-- 1993
+-- 헉..!
+
+# 데이터의 종류 개수에 따른.. 인덱스 성능
+select *
+from emp_org
+where gender = 'M'
+limit 500000;
+-- 총 row는 30만개인데 gender 종류는 2개가 전부임
+-- 데이터 종류가 적다?? -> cardinality가 낮다! -> 중복도가 높다!
+
+
+alter table emp_org add index idx_gender (gender);
+analyze table emp_org;
+show table status ;
+show index from emp_org;
+
+
+select *
+from emp_org
+where gender = 'M'
+limit 500000;
 
