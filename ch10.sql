@@ -100,9 +100,105 @@ begin
         when (v_birth_year % 12 = 9) then set tti = '3';
         when (v_birth_year % 12 = 10) then set tti = '2';
         else set tti = '1';
-    end case;
+        end case;
     select concat(v_name, '은 무슨띠??   ', tti);
 end $$
 delimiter ;
 call caseProc('조용필');
 
+
+# while 프로시져시져
+drop table if exists gugudan;
+create table gugudan
+(
+    txt varchar(100)
+);
+
+drop procedure if exists gugudanProc;
+delimiter $$
+create procedure gugudanProc()
+begin
+    declare str varchar(100);
+    declare i int; -- 앞자리
+    declare k int; -- 뒷자리
+
+    set i = 2; -- 2단부터
+    while (i < 10)
+        do
+            set str = '';
+            set k = 1;
+
+            while (k < 10)
+                do
+                    set str = concat(str, ' ', i, 'x', k, '=', i * k);
+                    set k = k + 1;
+                end while;
+            set i = i + 1;
+            insert into gugudan values (str);
+        end while;
+end $$
+delimiter ;
+
+call gugudanProc();
+select *
+from gugudan;
+
+
+# 오류 처리 프로시져~
+drop procedure if exists errorProc;
+delimiter $$
+create procedure errorProc()
+begin
+    declare i int;
+    declare sum int;
+    declare sum_before_ovferflow int;
+
+    declare exit handler for 1264
+        begin
+            select i, sum_before_ovferflow;
+        end;
+
+    set i = 1;
+    set sum = 0;
+
+    while (true)
+        do
+            set sum_before_ovferflow = sum;
+            set sum = sum + i;
+            set i = i + 1;
+        end while;
+end $$
+delimiter ;
+
+call errorProc();
+
+
+# 프로시져 정보
+select *
+from information_schema.ROUTINES
+where ROUTINE_SCHEMA = 'sqldb';
+
+select *
+from information_schema.PARAMETERS
+where SPECIFIC_SCHEMA = 'sqldb';
+
+# 이게 나을듯?
+show create procedure sqldb.userProc3;
+
+
+# 동적 sql 프로시져
+drop procedure if exists whatProc;
+delimiter $$
+create procedure whatProc(in table_name varchar(20))
+begin
+    set @query = concat('select * from ', table_name);
+    prepare myQuery from @query;
+    execute myQuery;
+    deallocate prepare myQuery;
+end $$
+delimiter ;
+
+call whatProc('user');
+
+# 프로시쟈 삭제 .. alter는 불가능...
+drop procedure whatProc;
