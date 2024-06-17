@@ -202,3 +202,47 @@ call whatProc('user');
 
 # 프로시쟈 삭제 .. alter는 불가능...
 drop procedure whatProc;
+
+
+# stored function
+set global log_bin_trust_function_creators = 1; -- 팡션 생성 권한 허용
+
+use sqldb;
+drop function if exists userFunc;
+delimiter $$
+create function userFunc(val1 int, val2 int)
+    returns int
+begin
+    return val1 + val2;
+end $$
+delimiter ;
+select userFunc(10, 20);
+
+
+# 나이 구하는 펑션~
+drop function if exists getAgeFunc;
+delimiter $$
+create function getAgeFunc(v_year int)
+    returns int
+begin
+    declare age int;
+    set age = year(curdate()) - v_year;
+    return age;
+end $$
+delimiter ;
+
+select getAgeFunc(1990)
+into @age1990;
+select getAgeFunc(1996)
+into @age1996;
+select concat('나이차 : ', @age1990 - @age1996, '살');
+select user_id, name, birth_year, getAgeFunc(birth_year) as 'age'
+from user;
+
+
+# function 정보 확인
+show create function getAgeFunc;
+
+# function 삭제
+drop function getAgeFunc;
+
