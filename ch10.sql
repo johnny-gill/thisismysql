@@ -246,3 +246,98 @@ show create function getAgeFunc;
 # function 삭제
 drop function getAgeFunc;
 
+
+# cursor 커서입니다
+drop procedure if exists cursorProc;
+delimiter $$
+create procedure cursorProc()
+begin
+    declare userHeight int;
+    declare cnt int default 0; -- 읽은 행의 수
+    declare totalHeight int default 0;
+    declare endOfRow boolean default false;
+
+    declare userCursor cursor for -- 커서 선언
+        select height from user;
+
+    declare continue handler for -- 행의 끝이면 true로
+        not found set endOfRow = true;
+
+    open userCursor; -- 커서 open
+
+    cursor_loop:
+    loop
+        fetch userCursor into userHeight;
+
+        if endOfRow then
+            leave cursor_loop;
+        end if;
+
+        set cnt = cnt + 1;
+        set totalHeight = totalHeight + userHeight;
+    end loop cursor_loop;
+
+    select concat('고객 키의 평균  ===>', (totalHeight / cnt));
+
+    close userCursor; -- 커서 close
+end $$
+delimiter ;
+
+call cursorProc();
+select avg(height)
+from user;
+
+
+# 구매액에 따른 고객 등급 지정 커서~~~~~
+alter table user
+    add grade varchar(5);
+
+drop procedure if exists gradeProc;
+delimiter $$
+create procedure gradeProc()
+begin
+    declare id char(8);
+    declare sum bigint;
+    declare userGrade varchar(5);
+    declare endOfRow boolean default false;
+
+    declare userCursor cursor for
+        select u.user_id, sum(price * amount)
+        from user u
+                 left join buy b
+                           on u.user_id = b.user_id
+        group by u.user_id;
+
+    declare continue handler for
+        not found set endOfRow = true;
+
+    open userCursor;
+
+    grade_loop:
+    loop
+        fetch userCursor into id, sum;
+
+        if endOfRow then
+            leave grade_loop;
+        end if;
+
+        case
+            when sum >= 1500 then set userGrade = '최우수고객';
+            when sum >= 1000 then set userGrade = '우수고객';
+            when sum >= 500 then set userGrade = '일반고객';
+            else set userGrade = '유령고객';
+            end case;
+
+        update user set grade = userGrade where user_id = id;
+    end loop grade_loop;
+
+    close userCursor;
+end $$
+delimiter ;
+
+call gradeProc();
+select *
+from user;
+
+
+
