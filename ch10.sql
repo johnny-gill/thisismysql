@@ -340,4 +340,223 @@ select *
 from user;
 
 
+# 트리거
+create database if not exists testDB;
+use testDB;
+create table if not exists test
+(
+    id  int,
+    txt varchar(10)
+);
+insert into test
+values (1, '뉴진스'),
+       (2, '아이브'),
+       (3, '블핑');
 
+
+drop trigger if exists testTrg;
+delimiter //
+create trigger testTrg
+    after delete -- 삭제 후 작동
+    on test
+    for each row -- 각 행마다 적용
+begin
+    set @msg = '가수 그룹이 삭제됨';
+end //
+delimiter ;
+
+set @msg = '';
+
+insert into test
+values (4, 'bts');
+select @msg;
+
+update test
+set txt = 'BTS'
+where id = 4;
+select @msg;
+
+delete
+from test
+where id = 4;
+select @msg;
+
+
+# 백업 트리거~
+use sqldb;
+drop table buy;
+create table user_bak
+(
+    user_id    char(8)     not null primary key,
+    name       varchar(10) not null,
+    birth_year int         not null,
+    addr       char(2)     not null,
+    mobile1    char(3),
+    mobile2    char(8),
+    height     smallint,
+    join_date  date,
+    mod_type   char(2), -- '수정', '삭제'
+    mod_date   date,
+    mod_user   varchar(256)
+);
+
+drop trigger if exists userBak_updateTrg;
+delimiter //
+create trigger userBak_updateTrg
+    after update
+    on user
+    for each row
+begin
+    insert into user_bak
+    values (old.user_id, old.name, old.birth_year, old.address, old.mobile1, old.mobile2,
+            old.height, old.join_date, '수정', curdate(), current_user());
+end //
+delimiter ;
+
+drop trigger if exists userBak_deleteTrg;
+delimiter //
+create trigger userBak_deleteTrg
+    after delete
+    on user
+    for each row
+begin
+    insert into user_bak
+    values (old.user_id, old.name, old.birth_year, old.address, old.mobile1, old.mobile2,
+            old.height, old.join_date, '삭제', curdate(), current_user());
+end //
+delimiter ;
+
+
+select *
+from user;
+select *
+from user_bak;
+update user
+set address = '일본'
+where user_id = 'JKW';
+delete
+from user
+where height >= 177;
+
+
+# insert trigger
+drop trigger if exists user_insertTrg;
+delimiter //
+create trigger user_insertTrg
+    after insert
+    on user
+    for each row
+begin
+    signal sqlstate '45000'
+        set message_text = '인서트 금지!!!!';
+end;
+delimiter ;
+
+insert into user
+values ('aaa', '오오', 1919, '인천', '010', '12345678', 199, curdate(), null);
+
+
+# before trigger
+-- sqldb 초기화
+drop trigger if exists user_beforeInsertTrg;
+delimiter //
+create trigger user_beforeInsertTrg
+    before insert
+    on user
+    for each row
+begin
+    if new.birth_year < 1900 then
+        set new.birth_year = 0;
+    elseif new.birth_year > year(curdate()) then
+        set new.birth_year = year(curdate());
+    end if;
+end //
+delimiter ;
+
+insert into user
+values ('aaa', '오오', 1888, '인천', '010', '12345678', 199, curdate());
+insert into user
+values ('bbb', '유유', 3000, '인천', '010', '12345678', 199, curdate());
+select *
+from user;
+
+show triggers from sqldb;
+
+drop trigger user_beforeInsertTrg;
+
+
+# 중첩 트리거 nested trigger
+drop database if exists triggerDB;
+create database if not exists triggerDB;
+use triggerDB;
+
+
+create table `order`
+(
+    order_no     int auto_increment primary key,
+    user_id      varchar(5),
+    product_name varchar(5),
+    qty          int
+);
+
+create table product
+(
+    product_name varchar(5),
+    qty          int
+);
+
+create table delivery
+(
+    delivery_no  int auto_increment primary key,
+    product_name varchar(5),
+    qty          int
+);
+
+insert into product
+values ('사과', 100),
+       ('수박', 100),
+       ('참외', 100);
+
+select *
+from product;
+
+
+drop trigger if exists orderTrg;
+delimiter //
+create trigger orderTrg
+    after insert
+    on `order`
+    for each row
+begin
+    update product
+    set qty = qty - new.qty
+    where product_name = new.product_name;
+end //
+delimiter ;
+
+drop trigger if exists productTrg;
+delimiter //
+create trigger productTrg
+    after update
+    on product
+    for each row
+begin
+    insert into delivery values (null, new.product_name, old.qty - new.qty);
+end //
+delimiter ;
+
+show triggers from triggerDB;
+
+insert into `order`
+values (null, 'john', '수박', 5);
+select *
+from `order`;
+select *
+from product;
+select *
+from delivery;
+
+alter table delivery
+    change product_name product_name_chg varchar(5);
+insert into `order`
+values (null, 'john', '수박', 5);
