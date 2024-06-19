@@ -94,5 +94,91 @@ set global innodb_ft_server_stopword_table = 'fulltext/stopword';
 -- 다시 fulltext index 생성
 create fulltext index idx_description on `fulltext` (description);
 select *
-from information_schema.INNODB_FT_INDEX_TABLE; -- stopword로 지정된 단어는 전체 테이블 인덱스에 저장되지 않음
+from information_schema.INNODB_FT_INDEX_TABLE;
+-- stopword로 지정된 단어는 전체 테이블 인덱스에 저장되지 않음
+
+
+# 파티션
+-- 파티션은 8192개까지 지원. 파티션 테이블은 파일이 동시에 열리는데, 동시에 파일 열 수 있는 개수가 5000(open_file_limit).
+-- 즉, 파티션 5000개 이상일때는 open_file_limit을 수정해줘야함
+
+-- sqldb 초기화
+use sqldb;
+select *
+from user;
+select *
+from buy;
+
+-- 파티션으로 테이블 생성
+create database if not exists part;
+use part;
+drop table if exists part;
+
+create table part
+(
+    user_id    char(8)     not null,
+    name       varchar(10) not null,
+    birth_year int         not null,
+    addr       char(2)     not null
+)
+    partition by range (birth_year) (
+        partition part1 values less than (1971), -- birth_year < 1971은 part1에 저장
+        partition part2 values less than (1979), -- 1971 <= birth_year < 1979은 part2에 저장
+        partition part3 values less than maxvalue -- 1979 <= birth_year < max은 part3에 저장
+        );
+-- C:\ProgramData\MySQL\MySQL Server 8.0\Data\part에 3개로 나눠서 생성됐음 ㅋㅋ
+-- range 열에는 숫자형이여야함.
+-- 예) partition by list columns (address) 은 숫자 또는 문자형으로..
+-- pk를 지정하고 싶으면 range 열을 포함하여 지정해야함.
+
+
+insert into part
+select user_id, name, birth_year, address
+from sqldb.user;
+select *
+from part; -- 파티션 순서대로 조회됨
+
+select *
+from information_schema.PARTITIONS
+where table_name = 'part';
+
+explain
+select *
+from part
+where birth_year <= 1965;
+-- part1 파티션만 사용했다~
+
+
+# 파티션 나누기
+alter table part
+    reorganize partition part3 into (
+        partition part3 values less than (1986),
+        partition part4 values less than maxvalue
+        );
+optimize table part;
+select *
+from information_schema.PARTITIONS
+where TABLE_NAME = 'part';
+
+
+# 파티션 합치기
+alter table part
+    reorganize partition part1, part2 into (
+        partition part12 values less than (1979)
+        );
+optimize table part;
+select *
+from information_schema.PARTITIONS
+where TABLE_NAME = 'part';
+
+
+# 파티션 삭제
+alter table part
+    drop partition part12;
+optimize table part;
+select *
+from information_schema.PARTITIONS
+where TABLE_NAME = 'part';
+select *
+from part;
 
